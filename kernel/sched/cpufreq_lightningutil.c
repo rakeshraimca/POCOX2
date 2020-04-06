@@ -11,6 +11,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+
 #include <linux/cpufreq.h>
 #include <linux/kthread.h>
 #include <linux/slab.h>
@@ -24,20 +25,20 @@
 #define RATE_LIMIT				0
 
 #define BIT_SHIFT_1 				3
-#define BIT_SHIFT_1_2 				2
-#define BIT_SHIFT_2 				10
-#define TARGET_LOAD_1				25
-#define TARGET_LOAD_2				75
+#define BIT_SHIFT_1_2 				3
+#define BIT_SHIFT_2 				2
+#define TARGET_LOAD_1				34
+#define TARGET_LOAD_2				84
 
-#define BIT_SHIFT_1_BIGC 			2
-#define BIT_SHIFT_1_2_BIGC 			2
-#define BIT_SHIFT_2_BIGC 			10
-#define TARGET_LOAD_1_BIGC 			25
-#define TARGET_LOAD_2_BIGC 			75
+#define BIT_SHIFT_1_BIGC 			3
+#define BIT_SHIFT_1_2_BIGC 			3
+#define BIT_SHIFT_2_BIGC 			2
+#define TARGET_LOAD_1_BIGC 			34
+#define TARGET_LOAD_2_BIGC 			84
 
-#define DEFAULT_SUSPEND_MAX_FREQ_SILVER 300000
-#define DEFAULT_SUSPEND_MAX_FREQ_GOLD 825600
-#define DEFAULT_SUSPEND_CAPACITY_FACTOR 10
+#define DEFAULT_SUSPEND_MAX_FREQ_SILVER 1401600
+#define DEFAULT_SUSPEND_MAX_FREQ_GOLD 1401600
+#define DEFAULT_SUSPEND_CAPACITY_FACTOR 6
 
 /* Stub out fast switch routines present on mainline to reduce the backport
  * overhead. */
@@ -188,7 +189,7 @@ static void smugov_update_commit(struct smugov_policy *sg_policy, u64 time,
 #define TARGET_LOAD 80
 /**
  * get_next_freq - Compute a new frequency for a given cpufreq policy.
- * @sg_policy: pixel_smurfutil policy object to compute the new frequency for.
+ * @sg_policy: lightningutil policy object to compute the new frequency for.
  * @util: Current CPU utilization.
  * @max: CPU capacity.
  *
@@ -211,8 +212,7 @@ static void smugov_update_commit(struct smugov_policy *sg_policy, u64 time,
 static unsigned int get_next_freq(struct smugov_policy *sg_policy,
 				  unsigned long util, unsigned long max)
 {
-
-
+        
 	bool state_suspended;	
 	struct cpufreq_policy *policy = sg_policy->policy;
 	struct smugov_tunables *tunables = sg_policy->tunables;
@@ -413,7 +413,7 @@ static void smugov_calc_avg_cap(struct smugov_policy *sg_policy, u64 curr_ws,
 }
 
 #define NL_RATIO 75
-#define DEFAULT_HISPEED_LOAD 90
+#define DEFAULT_HISPEED_LOAD 94
 static void smugov_walt_adjust(struct smugov_cpu *sg_cpu, unsigned long *util,
 			      unsigned long *max)
 {
@@ -652,13 +652,13 @@ static void smugov_irq_work(struct irq_work *irq_work)
 	sg_policy = container_of(irq_work, struct smugov_policy, irq_work);
 
 	/*
-	 * For RT and deadline tasks, the pixel_smurfutil governor shoots the
+	 * For RT and deadline tasks, the lightningutil governor shoots the
 	 * frequency to maximum. Special care must be taken to ensure that this
 	 * kthread doesn't result in the same behavior.
 	 *
 	 * This is (mostly) guaranteed by the work_in_progress flag. The flag is
 	 * updated only at the end of the smugov_work() function and before that
-	 * the pixel_smurfutil governor rejects all other frequency scaling requests.
+	 * the lightningutil governor rejects all other frequency scaling requests.
 	 *
 	 * There is a very rare case though, where the RT thread yields right
 	 * after the work_in_progress flag is cleared. The effects of that are
@@ -1061,7 +1061,7 @@ static struct kobj_type smugov_tunables_ktype = {
 
 /********************** cpufreq governor interface *********************/
 
-static struct cpufreq_governor pixel_smurfutil_gov;
+static struct cpufreq_governor lightningutil_gov;
 
 static struct smugov_policy *smugov_policy_alloc(struct cpufreq_policy *policy)
 {
@@ -1256,10 +1256,10 @@ static int smugov_init(struct cpufreq_policy *policy)
 	}
 
 	tunables->pl = 1;
-	tunables->up_rate_limit_us = 0;
-	tunables->down_rate_limit_us = 20000;
+	tunables->up_rate_limit_us = 3000;
+	tunables->down_rate_limit_us = 1500;
 	tunables->hispeed_load = DEFAULT_HISPEED_LOAD;
-	tunables->hispeed_freq = 0;
+	tunables->hispeed_freq = 1689600;
 	lat = policy->cpuinfo.transition_latency / NSEC_PER_USEC;
 	if (lat) {
 		tunables->up_rate_limit_us *= lat;
@@ -1297,7 +1297,7 @@ static int smugov_init(struct cpufreq_policy *policy)
 
 	ret = kobject_init_and_add(&tunables->attr_set.kobj, &smugov_tunables_ktype,
 				   get_governor_parent_kobj(policy), "%s",
-				   pixel_smurfutil_gov.name);
+				   lightningutil_gov.name);
 	if (ret)
 		goto fail;
 
@@ -1417,8 +1417,8 @@ static void smugov_limits(struct cpufreq_policy *policy)
 	sg_policy->need_freq_update = true;
 }
 
-static struct cpufreq_governor pixel_smurfutil_gov = {
-	.name = "pixel_smurfutil",
+static struct cpufreq_governor lightningutil_gov = {
+	.name = "lightningutil",
 	.owner = THIS_MODULE,
 	.init = smugov_init,
 	.exit = smugov_exit,
@@ -1427,15 +1427,15 @@ static struct cpufreq_governor pixel_smurfutil_gov = {
 	.limits = smugov_limits,
 };
 
-#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_PIXEL_SMURFUTIL
+#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_LIGHTNINGUTIL
 struct cpufreq_governor *cpufreq_default_governor(void)
 {
-	return &pixel_smurfutil_gov;
+	return &lightningutil_gov;
 }
 #endif
 
 static int __init smugov_register(void)
 {
-	return cpufreq_register_governor(&pixel_smurfutil_gov);
+	return cpufreq_register_governor(&lightningutil_gov);
 }
 fs_initcall(smugov_register);

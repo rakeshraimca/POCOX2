@@ -28,6 +28,7 @@
 #include <linux/mm_types_task.h>
 #include <linux/task_io_accounting.h>
 
+
 /* task_struct member predeclarations (sorted alphabetically): */
 struct audit_context;
 struct backing_dev_info;
@@ -53,6 +54,9 @@ struct sighand_struct;
 struct signal_struct;
 struct task_delay_info;
 struct task_group;
+
+
+
 
 /*
  * Task state bitmask. NOTE! These bits are also
