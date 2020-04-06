@@ -11,29 +11,30 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+
 #include <linux/cpufreq.h>
 #include <linux/kthread.h>
 #include <linux/slab.h>
 #include <trace/events/power.h>
 #include <linux/sched/sysctl.h>
+#include <uapi/linux/sched/types.h>
 #include <linux/state_notifier.h>
 #include "tune.h"
-#include <uapi/linux/sched/types.h>
 #include "sched.h"
 
 #define RATE_LIMIT				0
 
-#define BIT_SHIFT_1 				3
-#define BIT_SHIFT_1_2 				2
-#define BIT_SHIFT_2 				10
-#define TARGET_LOAD_1				25
-#define TARGET_LOAD_2				75
+#define BIT_SHIFT_1 				7
+#define BIT_SHIFT_1_2 				4
+#define BIT_SHIFT_2 				6
+#define TARGET_LOAD_1				30
+#define TARGET_LOAD_2				80
 
-#define BIT_SHIFT_1_BIGC 			2
-#define BIT_SHIFT_1_2_BIGC 			2
-#define BIT_SHIFT_2_BIGC 			10
-#define TARGET_LOAD_1_BIGC 			25
-#define TARGET_LOAD_2_BIGC 			75
+#define BIT_SHIFT_1_BIGC 			8
+#define BIT_SHIFT_1_2_BIGC 			4
+#define BIT_SHIFT_2_BIGC 			6
+#define TARGET_LOAD_1_BIGC 			30
+#define TARGET_LOAD_2_BIGC 			80
 
 #define DEFAULT_SUSPEND_MAX_FREQ_SILVER 300000
 #define DEFAULT_SUSPEND_MAX_FREQ_GOLD 825600
@@ -188,7 +189,7 @@ static void smugov_update_commit(struct smugov_policy *sg_policy, u64 time,
 #define TARGET_LOAD 80
 /**
  * get_next_freq - Compute a new frequency for a given cpufreq policy.
- * @sg_policy: pixel_smurfutil policy object to compute the new frequency for.
+ * @sg_policy: smurfutil policy object to compute the new frequency for.
  * @util: Current CPU utilization.
  * @max: CPU capacity.
  *
@@ -211,9 +212,8 @@ static void smugov_update_commit(struct smugov_policy *sg_policy, u64 time,
 static unsigned int get_next_freq(struct smugov_policy *sg_policy,
 				  unsigned long util, unsigned long max)
 {
-
-
-	bool state_suspended;	
+        
+        bool state_suspended;	
 	struct cpufreq_policy *policy = sg_policy->policy;
 	struct smugov_tunables *tunables = sg_policy->tunables;
 	unsigned int freq = arch_scale_freq_invariant() ?
@@ -232,7 +232,7 @@ static unsigned int get_next_freq(struct smugov_policy *sg_policy,
 
 	switch(policy->cpu){
 	case 0:
-		if(state_suspended &&  silver_max_freq > 0 && silver_max_freq < freq) {
+		if (state_suspended && silver_max_freq > 0 && silver_max_freq < freq) {
 			silver_max_freq = sg_policy->tunables->silver_suspend_max_freq;
 			return silver_max_freq;
 		}
@@ -240,12 +240,12 @@ static unsigned int get_next_freq(struct smugov_policy *sg_policy,
 	case 1:
 	case 2:
 	case 3:
-		if(state_suspended)
+		if (state_suspended)
 			return policy->min;
 		break;
 		
 	case 4:
-		if(state_suspended && gold_max_freq > 0 && gold_max_freq < freq) {
+		if (state_suspended && gold_max_freq > 0 && gold_max_freq < freq) {
 			gold_max_freq = sg_policy->tunables->gold_suspend_max_freq;
 			return gold_max_freq; 
 		}
@@ -253,7 +253,7 @@ static unsigned int get_next_freq(struct smugov_policy *sg_policy,
 	case 5:
 	case 6:
 	case 7:
-		if(state_suspended)
+		if (state_suspended)
 			return policy->min;
 		break;
 	default:
@@ -652,13 +652,13 @@ static void smugov_irq_work(struct irq_work *irq_work)
 	sg_policy = container_of(irq_work, struct smugov_policy, irq_work);
 
 	/*
-	 * For RT and deadline tasks, the pixel_smurfutil governor shoots the
+	 * For RT and deadline tasks, the smurfutil governor shoots the
 	 * frequency to maximum. Special care must be taken to ensure that this
 	 * kthread doesn't result in the same behavior.
 	 *
 	 * This is (mostly) guaranteed by the work_in_progress flag. The flag is
 	 * updated only at the end of the smugov_work() function and before that
-	 * the pixel_smurfutil governor rejects all other frequency scaling requests.
+	 * the smurfutil governor rejects all other frequency scaling requests.
 	 *
 	 * There is a very rare case though, where the RT thread yields right
 	 * after the work_in_progress flag is cleared. The effects of that are
@@ -1061,7 +1061,7 @@ static struct kobj_type smugov_tunables_ktype = {
 
 /********************** cpufreq governor interface *********************/
 
-static struct cpufreq_governor pixel_smurfutil_gov;
+static struct cpufreq_governor smurfutil_gov;
 
 static struct smugov_policy *smugov_policy_alloc(struct cpufreq_policy *policy)
 {
@@ -1256,8 +1256,8 @@ static int smugov_init(struct cpufreq_policy *policy)
 	}
 
 	tunables->pl = 1;
-	tunables->up_rate_limit_us = 0;
-	tunables->down_rate_limit_us = 20000;
+	tunables->up_rate_limit_us = LATENCY_MULTIPLIER;
+	tunables->down_rate_limit_us = LATENCY_MULTIPLIER;
 	tunables->hispeed_load = DEFAULT_HISPEED_LOAD;
 	tunables->hispeed_freq = 0;
 	lat = policy->cpuinfo.transition_latency / NSEC_PER_USEC;
@@ -1297,7 +1297,7 @@ static int smugov_init(struct cpufreq_policy *policy)
 
 	ret = kobject_init_and_add(&tunables->attr_set.kobj, &smugov_tunables_ktype,
 				   get_governor_parent_kobj(policy), "%s",
-				   pixel_smurfutil_gov.name);
+				   smurfutil_gov.name);
 	if (ret)
 		goto fail;
 
@@ -1417,8 +1417,8 @@ static void smugov_limits(struct cpufreq_policy *policy)
 	sg_policy->need_freq_update = true;
 }
 
-static struct cpufreq_governor pixel_smurfutil_gov = {
-	.name = "pixel_smurfutil",
+static struct cpufreq_governor smurfutil_gov = {
+	.name = "smurfutil",
 	.owner = THIS_MODULE,
 	.init = smugov_init,
 	.exit = smugov_exit,
@@ -1430,12 +1430,12 @@ static struct cpufreq_governor pixel_smurfutil_gov = {
 #ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_PIXEL_SMURFUTIL
 struct cpufreq_governor *cpufreq_default_governor(void)
 {
-	return &pixel_smurfutil_gov;
+	return &smurfutil_gov;
 }
 #endif
 
 static int __init smugov_register(void)
 {
-	return cpufreq_register_governor(&pixel_smurfutil_gov);
+	return cpufreq_register_governor(&smurfutil_gov);
 }
 fs_initcall(smugov_register);
