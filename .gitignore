@@ -42,7 +42,7 @@ out
 *.xz
 Module.symvers
 modules.builtin
-
+env.sh
 #
 # Top-level generic files
 #
