@@ -21,8 +21,6 @@ struct zcomp {
 	struct zcomp_strm * __percpu *stream;
 	const char *name;
 	struct hlist_node node;
-
-	const char *name;
 };
 
 int zcomp_cpu_up_prepare(unsigned int cpu, struct hlist_node *node);
