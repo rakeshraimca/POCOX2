@@ -127,6 +127,11 @@ struct sbitmap_queue {
 	 * @round_robin: Allocate bits in strict round-robin order.
 	 */
 	bool round_robin;
+	/**
+	 * @min_shallow_depth: The minimum shallow depth which may be passed to
+	 * sbitmap_queue_get_shallow() or __sbitmap_queue_get_shallow().
+	 */
+	unsigned int min_shallow_depth;
 };
 
 /**

@@ -329,6 +329,10 @@ static int ref_wr_duration[2];
  */
 static const unsigned long max_service_from_wr = 120000;
 
+static void sbitmap_queue_update_wake_batch(struct sbitmap_queue *sbq,
+					    unsigned int depth);
+
+
 #define BFQ_SERVICE_TREE_INIT	((struct bfq_service_tree)		\
 				{ RB_ROOT, RB_ROOT, NULL, NULL, 0, 0 })
 
@@ -351,6 +355,14 @@ static struct bfq_io_cq *icq_to_bic(struct io_cq *icq)
  * @ioc: the io_context of the process doing I/O.
  * @q: the request queue.
  */
+void sbitmap_queue_min_shallow_depth(struct sbitmap_queue *sbq,
+				     unsigned int min_shallow_depth)
+{
+	sbq->min_shallow_depth = min_shallow_depth;
+	//sbitmap_queue_update_wake_batch(sbq, sbq->sb.depth);
+}
+EXPORT_SYMBOL_GPL(sbitmap_queue_min_shallow_depth);
+
 static struct bfq_io_cq *bfq_bic_lookup(struct bfq_data *bfqd,
 					struct io_context *ioc,
 					struct request_queue *q)
